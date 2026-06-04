@@ -1,0 +1,119 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ResumeIQ — AI Resume Analyzer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#0a0b0f;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;min-height:100vh}
+.wrap{max-width:860px;margin:0 auto;padding:32px 20px}
+h1{font-size:28px;font-weight:800;color:#7c3aed;margin-bottom:4px}
+.sub{color:#64748b;font-size:14px;margin-bottom:32px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+.card{background:#10121a;border:1px solid #1e2535;border-radius:12px;padding:20px}
+label{display:block;font-size:13px;font-weight:600;margin-bottom:8px;color:#94a3b8}
+input,textarea{width:100%;background:#161926;border:1px solid #1e2535;border-radius:8px;padding:10px 14px;color:#e2e8f0;font-size:14px;outline:none;font-family:inherit}
+textarea{resize:vertical;line-height:1.6}
+.btn{width:100%;background:#7c3aed;border:none;border-radius:8px;padding:14px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;margin-top:16px;transition:opacity.2s}
+.btn:disabled{background:#374151;cursor:not-allowed}
+.btn:hover:not(:disabled){opacity:.85}
+.result{margin-top:28px}
+.score-wrap{background:#0f172a;border:1px solid #1e2535;border-radius:12px;padding:24px;display:flex;align-items:center;gap:28px;margin-bottom:16px}
+.score-num{font-size:64px;font-weight:800;line-height:1}
+.score-label{font-size:11px;color:#64748b;margin-top:4px;letter-spacing:1px}
+.rec{font-size:18px;font-weight:700;margin-bottom:8px}
+.rationale{color:#94a3b8;font-size:14px;line-height:1.6}
+.section{background:#10121a;border:1px solid #1e2535;border-radius:12px;padding:20px;margin-bottom:12px}
+.sec-title{font-weight:700;font-size:15px;margin-bottom:12px}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:11px;font-weight:600;padding:3px 10px;border-radius:4px}
+.tag-g{background:rgba(16,185,129,.1);color:#34d399}
+.tag-r{background:rgba(239,68,68,.1);color:#f87171}
+.tag-o{background:rgba(249,115,22,.1);color:#fb923c}
+.bullet{border-bottom:1px solid #1e2535;padding-bottom:12px;margin-bottom:12px}
+.bullet:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+.b-before{color:#ef4444;font-size:13px;margin-bottom:4px}
+.b-after{color:#10b981;font-size:13px;margin-bottom:4px}
+.b-why{color:#64748b;font-size:11px}
+.tip{display:flex;gap:8px;font-size:13px;color:#94a3b8;margin-bottom:8px}
+.cover{color:#94a3b8;line-height:1.7;font-style:italic;border-left:3px solid #7c3aed;padding-left:14px}
+.err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:12px 16px;color:#f87171;font-size:13px;margin-top:12px}
+@media(max-width:640px){.grid{grid-template-columns:1fr}.score-wrap{flex-direction:column;text-align:center}}
+</style></head><body>
+<div class="wrap">
+  <h1>🎯 ResumeIQ</h1>
+  <p class="sub">AI-powered resume vs job description analyzer · GPT-4o · Upload PDF or DOCX</p>
+
+  <div class="grid">
+    <div class="card">
+      <label>📄 Resume (PDF / DOCX / TXT)</label>
+      <input type="file" id="resumeFile" accept=".pdf,.docx,.txt"/>
+      <div id="fname" style="font-size:12px;color:#10b981;margin-top:6px"></div>
+    </div>
+    <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><label>Company</label><input id="company" placeholder="e.g. Stripe"/></div>
+      <div><label>Role</label><input id="role" placeholder="e.g. Full Stack Eng"/></div>
+    </div>
+  </div>
+  <div class="card" style="margin-bottom:0">
+    <label>📋 Job Description (paste full JD)</label>
+    <textarea id="jd" rows="7" placeholder="We are looking for a Full Stack Engineer with 3+ years of experience in Java/Spring Boot, React, and cloud infrastructure..."></textarea>
+  </div>
+  <button class="btn" id="analyzeBtn" onclick="analyze()">🔍 Analyze Resume — GPT-4o</button>
+  <div id="err" class="err" style="display:none"></div>
+  <div class="result" id="result" style="display:none"></div>
+</div>
+<script>
+document.getElementById('resumeFile').onchange=e=>{
+  const f=e.target.files[0];
+  if(f) document.getElementById('fname').textContent='✓ '+f.name;
+};
+function scoreColor(s){return s>=80?'#10b981':s>=60?'#f59e0b':s>=40?'#f97316':'#ef4444'}
+async function analyze(){
+  const file=document.getElementById('resumeFile').files[0];
+  const jd=document.getElementById('jd').value.trim();
+  const errEl=document.getElementById('err');
+  errEl.style.display='none';
+  if(!file||!jd){errEl.textContent='Please upload a resume and paste a job description.';errEl.style.display='block';return;}
+  const btn=document.getElementById('analyzeBtn');
+  btn.disabled=true;btn.textContent='⏳ Analyzing with GPT-4o (15–30s)...';
+  const fd=new FormData();
+  fd.append('resume',file);
+  fd.append('job_description',jd);
+  fd.append('company_name',document.getElementById('company').value);
+  fd.append('role_title',document.getElementById('role').value);
+  try{
+    const r=await fetch('/analyze',{method:'POST',body:fd});
+    if(!r.ok)throw new Error(await r.text());
+    const d=await r.json();
+    showResult(d);
+  }catch(e){errEl.textContent='Error: '+e.message;errEl.style.display='block';}
+  btn.disabled=false;btn.textContent='🔍 Analyze Resume — GPT-4o';
+}
+function showResult(d){
+  const el=document.getElementById('result');
+  el.style.display='block';
+  const c=scoreColor(d.fit_score);
+  const recLabel={'STRONG_FIT':'Strong Fit ✅','GOOD_FIT':'Good Fit 👍','WEAK_FIT':'Weak Fit ⚠️','NOT_A_FIT':'Not a Fit ❌'}[d.recommendation]||d.recommendation;
+  let html=`<div class="score-wrap">
+    <div><div class="score-num" style="color:${c}">${d.fit_score}</div><div class="score-label">FIT SCORE / 100</div></div>
+    <div><div class="rec" style="color:${c}">${recLabel}</div><div class="rationale">${d.score_rationale||''}</div></div>
+  </div>`;
+  html+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+    <div class="section"><div class="sec-title" style="color:#10b981">✅ Matched Keywords</div><div class="tags">${(d.matched_keywords||[]).map(k=>`<span class="tag tag-g">${k}</span>`).join('')||'<span style="color:#64748b;font-size:13px">None found</span>'}</div></div>
+    <div class="section"><div class="sec-title" style="color:#ef4444">❌ Missing Keywords</div><div class="tags">${[...(d.missing_keywords||[]).map(k=>`<span class="tag tag-r">${k}</span>`),(d.missing_skills||[]).map(k=>`<span class="tag tag-o">${k}</span>`)].join('')||'<span style="color:#64748b;font-size:13px">None — great coverage!</span>'}</div></div>
+  </div>`;
+  if(d.bullet_rewrites?.length){
+    html+=`<div class="section"><div class="sec-title">✍️ Bullet Point Rewrites</div>`;
+    d.bullet_rewrites.forEach(r=>{html+=`<div class="bullet"><div class="b-before">Before: ${r.original}</div><div class="b-after">After: ${r.improved}</div><div class="b-why">💡 ${r.changes}</div></div>`;});
+    html+=`</div>`;
+  }
+  if(d.ats_tips?.length){
+    html+=`<div class="section"><div class="sec-title">🤖 ATS Tips</div>`;
+    d.ats_tips.forEach(t=>{html+=`<div class="tip"><span style="color:#7c3aed">▸</span>${t}</div>`;});
+    html+=`</div>`;
+  }
+  if(d.cover_letter_opener){
+    html+=`<div class="section"><div class="sec-title">✉️ Cover Letter Opener</div><div class="cover">${d.cover_letter_opener}</div></div>`;
+  }
+  el.innerHTML=html;
+  el.scrollIntoView({behavior:'smooth'});
+}
+</script></body></html>
